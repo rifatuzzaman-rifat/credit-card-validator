@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Credit-Card Demo – Fixed</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{--bg1:#f6fbff;--bg2:#eef7ff;--card-bg:rgba(255,255,255,.85);--accent:#2563eb;--muted:#6b7280;--err:#b91c1c;--ok:#15803d}
+  @media(prefers-color-scheme:dark){
+    :root{--bg1:#1a1f24;--bg2:#10161a;--card-bg:rgba(0,0,0,.85);--accent:#60a5fa;--muted:#9ca3af;--err:#ef4444;--ok:#22c55e}
+    .card-front,.card-back{filter:invert(1)}
+    
+    input[type=text], input[type=password], input[type=tel] {
+      background: var(--bg2);
+      border-color: transparent;
+      color: #eee;
+    }
+    input:focus {
+      background: var(--bg1);
+      border-color: var(--accent);
+    }
+    
+    button.secondary {
+       border: 2px solid var(--bg2);
+    }
+    button.secondary:hover {
+      background: var(--bg2);
+      border-color: var(--bg2);
+    }
+    
+    .error > .icon {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23ef4444'%3E%3Cpath fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z' clip-rule='evenodd' /%3E%3C/svg%3E");
+    }
+    .ok > .icon {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2322c55e'%3E%3Cpath fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z' clip-rule='evenodd' /%3E%3C/svg%3E");
+    }
+    
+    .chip, .chip::before, .chip::after, .security-hologram {
+      filter: invert(1);
+    }
+    
+    .signature-strip, .cvv-box {
+      filter: invert(1);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial}
+  body{background:linear-gradient(180deg,var(--bg1),var(--bg2));display:flex;align-items:center;justify-content:center;padding:28px}
+  .wrap{max-width:980px;display:grid;grid-template-columns:420px 1fr;gap:28px;align-items:start}
+  @media(max-width:880px){.wrap{grid-template-columns:1fr}}
+  .card-preview{perspective:1200px;width:420px;margin:auto}
+  .card-sheet{
+    width:100%;height:260px;border-radius:16px;background:linear-gradient(135deg,#fffcc,#f0f9ffcc);
+    box-shadow: 0 1px 3px rgba(16,24,40,.05), 
+                0 10px 20px rgba(16,24,40,.05), 
+                0 20px 40px rgba(16,24,40,.05);
+    padding:20px;transform-style:preserve-3d;
+    transition:transform .6s cubic-bezier(.2,.9,.3,1), 
+               box-shadow .3s ease;
+    cursor: pointer; 
+  }
+  
+  .card-sheet:not(.flipped):hover {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 2px 5px rgba(16,24,40,.08), 
+                0 15px 30px rgba(16,24,40,.1), 
+                0 25px 50px rgba(16,24,40,.1);
+  }
+  
+  .card-sheet.flipped{transform:rotateY(180deg)}
+  .card-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:12px;padding:20px}
+  .card-front{background:linear-gradient(135deg,#fff,#eef8ff);color:#083344;font-weight:600}
+  .card-back{transform:rotateY(180deg);background:linear-gradient(135deg,#f8fafc,#e9f3ff);color:#083344}
+  .card-chips{
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+    min-height: 60px;
+  }
+
+  .chip {
+    width: 54px;
+    height: 40px;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden; 
+    background-color: #d4af37;
+    background-image: 
+      radial-gradient(circle at 10% 10%, rgba(255,255,255,0.4) 0%, transparent 30%),
+      radial-gradient(circle at 90% 90%, rgba(0,0,0,0.2) 0%, transparent 30%),
+      radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 50%),
+      linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.05) 75%, transparent 75%, transparent),
+      linear-gradient(-45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.05) 75%, transparent 75%, transparent);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 10px 10px, 10px 10px;
+    box-shadow: 
+      inset 0 1px 2px rgba(0,0,0,0.2), 
+      inset 0 -1px 2px rgba(255,255,255,0.2);
+  }
+  .chip::before {
+      content: '';
+      position: absolute;
+      top: 15%; bottom: 15%;
+      left: 20%; width: 5%;
+      background: linear-gradient(to bottom, #bb9d5a, #e4d098, #bb9d5a);
+      border-radius: 1px;
+      box-shadow: 20px 0 0 #bb9d5a, 25px 0 0 #bb9d5a;
+  }
+  .chip::after {
+      content: '';
+      position: absolute;
+      left: 15%; right: 15%;
+      top: 45%; height: 5%;
+      background: linear-gradient(to right, #bb9d5a, #e4d098, #bb9d5a);
+      border-radius: 1px;
+      box-shadow: 0 10px 0 #bb9d5a;
+  }
+  
+  .contactless-symbol {
+    width: 28px;
+    height: 28px;
+    position: absolute;
+    left: 68px;
+    top: 6px;
+    opacity: 0.7;
+    transform: rotate(90deg);
+  }
+  .contactless-symbol::before, .contactless-symbol::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    margin: auto;
+    border: 2px solid #083344;
+    border-radius: 50%;
+  }
+  .contactless-symbol::before {
+    width: 60%; height: 60%;
+  }
+  .contactless-symbol::after {
+    width: 80%; height: 80%;
+  }
+  .security-hologram {
+    width: 35px;
+    height: 35px;
+    position: absolute;
+    right: 20px;
+    bottom: 65px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, 
+      #b8c0c8 0%, 
+      #dbe0e4 25%, 
+      #ffffff 40%, 
+      #c0c8d0 60%, 
+      #b8c0c8 100%
+    );
+    box-shadow: inset 0 0 3px rgba(0,0,0,0.1);
+  }
+  
+  .brand-logo svg{width:60px;height:40px}
+  #previewBrand{
+    position: relative;
+    width: 80px;
+    text-align: right;
+    font-weight: 700;
+    color: #00579f;
+  }
+  .pan{font-size:20px;letter-spacing:2px;margin-bottom:8px}
+  .meta-line{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted)}
+  .holder{margin-top:18px;font-size:14px;color:#123;opacity:.95}
+  
+  .cvv-box{
+    background:#fff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='20' viewBox='0 0 80 20'%3E%3Ctext x='0' y='15' font-family='Arial' font-size='14' font-weight='bold' fill='rgba(0,0,0,0.1)' transform='rotate(-10 10,10)'%3EDEMO%3C/text%3E%3C/svg%3E");
+    border-radius:8px;
+    padding:8px 10px;
+    margin-top:10px;
+    box-shadow:inset 0 1px 0 rgba(0,0,0,.03);
+    text-align: right;
+    
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    line-height: 1;
+    
+    /* --- THE FIX --- */
+    margin-bottom: 24px; /* Added space for the "Demo Bank" text below it */
+  }
+  .cvv-box > div:first-child {
+    font-size:11px;
+    color:var(--muted);
+    line-height: 1;
+  }
+  #previewCvv {
+    font-weight:700;
+    letter-spacing:4px;
+    font-size: 15px;
+    line-height: 1;
+  }
+  
+  .magstripe{height:40px;background:#232323;margin-top:18px;border-radius:4px}
+  
+  .signature-strip {
+    height: 38px;
+    background: #f0f0f0;
+    margin-top: 10px;
+    border-radius: 4px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='38' viewBox='0 0 120 38'%3E%3Ctext x='10' y='25' font-family='Arial' font-size='16' font-weight='bold' fill='rgba(0,0,0,0.1)' transform='skewX(-20)'%3EDEMO BANK%3C/text%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: center;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+  }
+  
+  .pane{background:var(--card-bg);backdrop-filter:blur(6px);border-radius:12px;padding:20px;box-shadow:0 8px 30px rgba(16,24,40,.06)}
+  h2{color:var(--accent);margin:0 0 10px}
+  p.lead{margin:0 0 16px;color:var(--muted);font-size:14px}
+  form .row{display:flex;gap:12px}
+  form .col{flex:1}
+  
+  label{
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  input[type=text],input[type=password],input[type=tel]{
+    width:100%;
+    padding: 11px 14px; 
+    border-radius:10px;
+    border: 2px solid transparent; 
+    background: var(--bg1); 
+    font-size:15px;
+    transition: border-color .2s, box-shadow .2s, background-color .2s;
+  }
+  
+  #pan {
+    flex: 1;
+    width: auto;
+  }
+  
+  input:focus{
+    outline:none;
+    border-color:var(--accent);
+    box-shadow:0 6px 18px rgba(37,99,235,.12);
+    background: #fff; 
+  }
+  input.invalid{border-color:var(--err)}
+  
+  .error, .ok {
+    display: flex; 
+    align-items: flex-start;
+    gap: 6px;
+    overflow: hidden; 
+    height: 0; 
+    opacity: 0;
+    transition: height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+    margin-top: 0; 
+  }
+  .error:has(.msg-text:not(:empty)), 
+  .ok:has(.msg-text:not(:empty)) {
+    height: 22px; 
+    opacity: 1;
+    margin-top: 8px;
+  }
+  .error > .icon, .ok > .icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0; 
+    margin-top: 1px; 
+  }
+  .error .msg-text, .ok .msg-text {
+    display: inline-block;
+    font-style: normal; 
+    line-height: 1.4;
+    font-size: 13px;
+  }
+  .error .msg-text { color: var(--err); }
+  .ok .msg-text { color: var(--ok); }
+
+  .error > .icon {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23b91c1c'%3E%3Cpath fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z' clip-rule='evenodd' /%3E%3C/svg%3E");
+  }
+  .ok > .icon {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2315803d'%3E%3Cpath fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z' clip-rule='evenodd' /%3E%3C/svg%3E");
+  }
+
+  .actions{display:flex;gap:12px;margin-top:16px;align-items:center}
+  
+  button.primary{
+    background:var(--accent);
+    color:#fff;
+    padding: 11px 16px;
+    border-radius:10px;
+    border:0;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, .2); 
+    transition: all 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
+    
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 150px;
+  }
+
+  button.primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, .3);
+    filter: brightness(1.1);
+  }
+  
+  button.secondary{
+    background: transparent;
+    color: var(--muted);
+    border: 2px solid var(--bg2);
+    font-weight: 600;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  button.secondary:hover {
+    background: var(--bg1);
+    border-color: var(--bg1);
+    color: var(--accent);
+  }
+  
+  .btn-text {
+    transition: opacity 0.2s ease;
+  }
+  .spinner {
+    display: none;
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s linear infinite;
+  }
+  
+  button.primary.loading {
+    opacity: 0.8;
+    cursor: wait;
+  }
+  button.primary.loading .btn-text {
+    opacity: 0;
+  }
+  button.primary.loading .spinner {
+    display: block;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  .brand-inline{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    color: var(--muted);
+    min-width: 100px;
+    justify-content: flex-end;
+  }
+  
+  .brand-inline img{
+    width: 27px;
+    height: 18px;
+    object-fit: contain;
+  }
+  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  @media(max-width:520px){.card-sheet{height:200px}.card-preview{width:100%}}
+</style>
+
+
+</head>
+<body>
+<div class="wrap" aria-live="polite">
+  <div class="card-preview">
+    <div id="cardSheet" class="card-sheet" role="img" aria-label="Credit card preview. Click to flip.">
+      <div class="card-face card-front">
+        <div class="card-chips">
+          <div class="chip"></div>
+          <div class="contactless-symbol"></div>
+          <div id="previewBrand" class="brand-logo">UNKNOWN</div>
+        </div>
+        <div class="security-hologram"></div>
+        <div class="pan" id="previewPan">•••• •••• •••• ••••</div>
+        <div class="meta-line">
+          <div><div style="font-size:11px;color:var(--muted)">Card holder</div><div class="holder" id="previewName">FULL NAME</div></div>
+          <div style="text-align:right"><div style="font-size:11px;color:var(--muted)">Expires</div><div class="holder" id="previewExpiry">MM/YY</div></div>
+        </div>
+      </div>
+      <div class="card-face card-back">
+        <div class="magstripe"></div>
+        <div class="signature-strip"></div>
+        <div class="cvv-box">
+          <div>CVV</div>
+          <div id="previewCvv">•••</div>
+        </div>
+        <div style="position:absolute;bottom:20px;right:20px;color:var(--muted);font-size:13px">Demo Bank</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pane" role="form" aria-labelledby="formTitle">
+    <h2 id="formTitle">Payment details</h2>
+    <p class="lead">Demo – client-side only. Use test numbers.</p>
+
+    <form id="cardForm" novalidate>
+      <div style="margin-bottom:12px">
+        <label for="name">Cardholder name</label>
+        <input id="name" type="text" autocomplete="cc-name" placeholder="John Doe" required>
+        <div id="nameError" class="error" role="alert" aria-live="polite"><span class="icon"></span><em class="msg-text"></em></div>
+        <div id="nameOk" class="ok"><span class="icon"></span><em class="msg-text"></em></div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label for="pan">Card number</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input id="pan" type="tel" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" maxlength="23" required>
+          <div class="brand-inline" aria-hidden="true">
+            <img id="logoVisa"     src="img/visa.png" alt="Visa"     style="display:none">
+            <img id="logoMC"       src="img/mastercard.png" alt="Mastercard" style="display:none">
+            <img id="logoAmex"     src="img/amex.png" alt="Amex"     style="display:none">
+            <img id="logoDiscover" src="img/discover.png" alt="Discover" style="display:none">
+            <img id="logoJCB"      src="img/jcb.png" alt="JCB"      style="display:none">
+            <span id="brandText">Unknown</span>
+          </div>
+        </div>
+        <div id="panError" class="error" role="alert" aria-live="polite"><span class="icon"></span><em class="msg-text"></em></div>
+        <div id="panOk" class="ok"><span class="icon"></span><em class="msg-text"></em></div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label for="expiry">Expiry (MM/YY)</label>
+          <input id="expiry" type="text" inputmode="numeric" placeholder="MM/YY" maxlength="5" autocomplete="cc-exp" required>
+          <div id="expError" class="error" role="alert" aria-live="polite"><span class="icon"></span><em class="msg-text"></em></div>
+          <div id="expOk" class="ok"><span class="icon"></span><em class="msg-text"></em></div>
+        </div>
+        <div class="col">
+          <label for="cvv">CVV</label>
+          <input id="cvv" type="password" inputmode="numeric" placeholder="123" maxlength="4" autocomplete="cc-csc" required>
+          <div id="cvvError" class="error" role="alert" aria-live="polite"><span class="icon"></span><em class="msg-text"></em></div>
+          <div id="cvvOk" class="ok"><span class="icon"></span><em class="msg-text"></em></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="primary" id="submitBtn">
+          <span class="btn-text">Validate & Tokenize</span>
+          <span class="spinner"></span>
+        </button>
+        <button type="button" class="secondary" id="resetBtn">Reset</button>
+      </div>
+
+      <div id="formResult" class="" aria-live="polite" style="margin-top:12px"></div>
+    </form>
+
+    <p class="hint sr" style="margin-top:14px;color:var(--muted)">
+      Security: This is a demo. Never log raw PAN/CVV. Use tokenisation in production.
+    </p>
+  </div>
+</div>
+
+<script>
+(function () {
+  /* ---------- utilities ---------- */
+  
+  const brands = [
+    {name:'Visa',       test:/^4/,          lengths:[13,16,19], cvv:3, logo:'logoVisa'},
+    {
+      name:'Mastercard',
+      test: (p) => { 
+        if (/^5[1-5]/.test(p)) return true;
+        const first6 = +p.slice(0, 6);
+        return (first6 >= 222100 && first6 <= 272099);
+      },
+      lengths:[16],
+      cvv:3,
+      logo:'logoMC'
+    },
+    {name:'Amex',       test:/^3[47]/,      lengths:[15],       cvv:4, logo:'logoAmex'},
+    {name:'Discover',   test:/^(6011|65|64[4-9])/, lengths:[16,19], cvv:3, logo:'logoDiscover'},
+    {name:'JCB',        test:/^35/,         lengths:[16],       cvv:3, logo:'logoJCB'}
+  ];
+  const MAX_FUTURE_YEARS = 30;
+
+  const digits = s => (s||'').replace(/\D/g,'');
+
+  function luhn(s){
+    const d = digits(s);
+    if(!d) return false;
+    let sum=0, alt=false;
+    for(let i=d.length-1;i>=0;i--){
+      let n = d.charCodeAt(i)-48;
+      if(alt){ n*=2; if(n>9) n-=9; }
+      sum+=n; alt=!alt;
+    }
+    return sum%10===0;
+  }
+
+  function detect(pan){
+    const p = digits(pan);
+    const unknown = {name:'Unknown',cvv:3,lengths:[]};
+    if(!p) return unknown;
+    
+    for (const brand of brands) {
+      let passed = false;
+      if (typeof brand.test === 'function') {
+        passed = brand.test(p);
+      } else if (brand.test instanceof RegExp) {
+        passed = brand.test.test(p);
+      }
+      if (passed) return brand;
+    }
+    return unknown;
+  }
+
+  function formatPan(raw){
+    return raw.match(/.{1,4}/g)?.join(' ')||'';
+  }
+  function cursorPos(digitIdx,total){
+    let pos=0;
+    for(let i=0;i<digitIdx;i++){
+      pos++; if((i+1)%4===0 && i+1<total) pos++;
+    }
+    return pos;
+  }
+
+  const debounce = (fn,ms=300)=>{let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)};};
+
+  /* ---------- DOM ---------- */
+  const els = {
+    pan:document.getElementById('pan'), name:document.getElementById('name'),
+    exp:document.getElementById('expiry'), cvv:document.getElementById('cvv'),
+    panErr:document.getElementById('panError'), panOk:document.getElementById('panOk'),
+    expErr:document.getElementById('expError'), expOk:document.getElementById('expOk'),
+    cvvErr:document.getElementById('cvvError'), cvvOk:document.getElementById('cvvOk'),
+    nameErr:document.getElementById('nameError'), nameOk:document.getElementById('nameOk'),
+    result:document.getElementById('formResult'),
+    prevPan:document.getElementById('previewPan'), prevName:document.getElementById('previewName'),
+    prevExp:document.getElementById('previewExpiry'), prevCvv:document.getElementById('previewCvv'),
+    prevBrand:document.getElementById('previewBrand'), brandText:document.getElementById('brandText'),
+    card:document.getElementById('cardSheet'),
+    submitBtn:document.getElementById('submitBtn') 
+  };
+  
+  const logos = {
+    Visa:document.getElementById('logoVisa'),
+    MC:document.getElementById('logoMC'),
+    Amex:document.getElementById('logoAmex'),
+    Discover:document.getElementById('logoDiscover'),
+    JCB:document.getElementById('logoJCB')
+  };
+
+  
+  function showLogo(name){
+    Object.values(logos).forEach(l => l.style.display = 'none');
+    els.prevBrand.innerHTML = '';
+    els.brandText.textContent = name;
+
+    if(name === 'Unknown'){
+      els.prevBrand.textContent = 'UNKNOWN';
+      return;
+    }
+
+    const key = name === 'Mastercard' ? 'MC' : name;
+    const sourceLogo = logos[key];
+
+    const previewLogo = sourceLogo.cloneNode(true);
+    previewLogo.style.display = 'block';
+    previewLogo.style.width = '68px';
+    previewLogo.style.height = 'auto';
+    previewLogo.style.position = 'absolute';
+    previewLogo.style.right = '20px';
+    previewLogo.style.top = '50%';
+    previewLogo.style.transform = 'translateY(-50%)';
+
+    els.prevBrand.style.position = 'relative';
+    els.prevBrand.style.height = '60px';
+    els.prevBrand.appendChild(previewLogo);
+  }
+
+  function resetFieldValidation(fieldName) {
+    els[fieldName].classList.remove('invalid');
+    if(els[fieldName + 'Err']) els[fieldName + 'Err'].querySelector('.msg-text').textContent = '';
+    if(els[fieldName + 'Ok']) els[fieldName + 'Ok'].querySelector('.msg-text').textContent = '';
+  }
+
+  /* ---------- live PAN handling ---------- */
+  
+  const livePan = debounce(()=>{
+    const raw = digits(els.pan.value).slice(0,19);
+    const before = digits(els.pan.value.slice(0,els.pan.selectionStart)).length;
+    els.pan.value = formatPan(raw);
+    els.pan.selectionStart = els.pan.selectionEnd = cursorPos(before,raw.length);
+
+    const brand = detect(raw);
+    els.prevPan.textContent = formatPan(raw)||'•••• •••• •••• ••••';
+    els.prevName.textContent = els.name.value.trim()||'FULL NAME';
+    showLogo(brand.name);
+
+    els.cvv.maxLength = brand.cvv||3;
+    els.cvv.placeholder = brand.cvv===4?'1234':'123';
+
+    if (raw.length > 0) {
+      validatePan(raw, brand);
+    } else {
+      resetFieldValidation('pan');
+    }
+  }, 200); 
+  
+  els.pan.addEventListener('input', livePan);
+  els.pan.addEventListener('paste',()=>setTimeout(livePan,0));
+  
+  /* ---------- other live previews ---------- */
+  
+  els.name.addEventListener('input',()=>{
+    resetFieldValidation('name');
+    els.prevName.textContent=els.name.value.trim()||'FULL NAME';
+  });
+  
+  const validateNameDebounced = debounce(() => {
+    if (els.name.value.length > 0) validateName(els.name.value.trim());
+  }, 300);
+  els.name.addEventListener('input', validateNameDebounced);
+  
+  
+  els.exp.addEventListener('input',()=>{
+    resetFieldValidation('exp');
+    let v=els.exp.value.replace(/\D/g,'').slice(0,4);
+    if(v.length>=3) v=v.slice(0,2)+'/'+v.slice(2);
+    els.exp.value=v;
+    els.prevExp.textContent=v||'MM/YY';
+  });
+  
+  const validateExpDebounced = debounce(() => {
+    if (els.exp.value.length > 0) validateExp(els.exp.value.trim());
+  }, 300);
+  els.exp.addEventListener('input', validateExpDebounced);
+  
+  els.cvv.addEventListener('focus',()=>{els.card.classList.add('flipped');els.prevCvv.textContent='•'.repeat(els.cvv.value.length)||'•••';});
+  
+  els.cvv.addEventListener('blur',()=>{
+    els.card.classList.remove('flipped');
+    els.prevCvv.textContent='•••';
+  });
+
+  els.card.addEventListener('click', () => {
+    els.card.classList.toggle('flipped');
+  });
+  
+  els.cvv.addEventListener('input',()=>{
+    resetFieldValidation('cvv');
+    els.prevCvv.textContent='•'.repeat(els.cvv.value.length)||(els.cvv.maxLength===4?'••••':'•••')
+  });
+  
+  const validateCvvDebounced = debounce(() => {
+    if (els.cvv.value.length > 0) {
+      const brand = detect(digits(els.pan.value));
+      validateCvv(els.cvv.value.trim(), brand);
+    }
+  }, 300);
+  els.cvv.addEventListener('input', validateCvvDebounced);
+
+
+  /* ---------- validation ---------- */
+  
+  function clearAll(){
+    [els.panErr,els.expErr,els.cvvErr,els.nameErr,els.panOk,els.expOk,els.cvvOk,els.nameOk].forEach(e=>{
+      if (e) e.querySelector('.msg-text').textContent = '';
+    });
+    [els.pan,els.exp,els.cvv,els.name].forEach(i=>i.classList.remove('invalid'));
+    els.result.textContent=''; els.result.className='';
+  }
+  
+  function ok(id) {
+    const el = document.getElementById(id);
+    if (el) el.querySelector('.msg-text').textContent = 'Valid';
+  }
+  function err(id, msg) {
+    const el = document.getElementById(id);
+    if (el) el.querySelector('.msg-text').textContent = msg;
+  }
+
+  function validateName(v){
+    resetFieldValidation('name');
+    if(!v||v.trim().length<3){err('nameError','Enter name.');return false;}
+    if(!/^[A-Za-zÀ-ÖØ-öø-ÿ\s'-]+$/.test(v.trim())){err('nameError','Letters, spaces, hyphens, apostrophes only.');return false;}
+    ok('nameOk');return true;
+  }
+  function validatePan(raw,brand){
+    resetFieldValidation('pan');
+    if (raw.length < Math.min(...(brand.lengths.length ? brand.lengths : [12]))) {
+      err('panError', 'Card number length incorrect.');
+      return false;
+    }
+    const lens = brand.lengths.length?brand.lengths:[12,13,14,15,16,17,18,19];
+    if(!lens.includes(raw.length)){err('panError','Card number length incorrect.');return false;}
+    if(!luhn(raw)){err('panError','Card number failed Luhn check.');return false;}
+    ok('panOk');return true;
+  }
+  
+  function validateExp(v){
+    resetFieldValidation('exp');
+    if(!/^\d{2}\/\d{2}$/.test(v)){err('expError','Use MM/YY format.');return false;}
+    const [m,y]=v.split('/').map(Number);
+    if(m<1||m>12){err('expError','Invalid month.');return false;}
+    
+    const now=new Date(), cy=Math.floor(now.getFullYear()/100);
+    let year=cy*100+y;
+    
+    if(year-now.getFullYear()<-1) year+=100; 
+
+    const exp=new Date(year,m,0,23,59,59); 
+
+    if(exp<now){err('expError','Card expired.');return false;} 
+    if(year-now.getFullYear()>MAX_FUTURE_YEARS){err('expError','Expiry too far in future.');return false;}
+    
+    ok('expOk');return true;
+  }
+
+  function validateCvv(v,brand){
+    resetFieldValidation('cvv');
+    const len=brand.cvv||3;
+    if(!new RegExp(`^\\d{${len}}$`).test(v)){err('cvvError',`CVV must be ${len} digits.`);return false;}
+    ok('cvvOk');return true;
+  }
+
+  /* ---------- submit ---------- */
+  
+  document.getElementById('cardForm').addEventListener('submit',e=>{
+    e.preventDefault(); 
+    clearAll();
+    
+    const name=els.name.value.trim();
+    const panRaw=digits(els.pan.value);
+    const exp=els.exp.value.trim();
+    const cvv=els.cvv.value.trim();
+    const brand=detect(panRaw);
+
+    const isNameValid = validateName(name);
+    if (!isNameValid) els.name.classList.add('invalid');
+    
+    const isPanValid = validatePan(panRaw, brand);
+    if (!isPanValid) els.pan.classList.add('invalid');
+
+    const isExpValid = validateExp(exp);
+    if (!isExpValid) els.exp.classList.add('invalid');
+    
+    const isCvvValid = validateCvv(cvv, brand);
+    if (!isCvvValid) els.cvv.classList.add('invalid');
+    
+    if (!isNameValid || !isPanValid || !isExpValid || !isCvvValid) {
+      return;
+    }
+
+    els.result.textContent='Simulating tokenisation...';
+    els.submitBtn.classList.add('loading');
+    els.submitBtn.disabled = true;
+
+    setTimeout(()=>{
+      const token='tok_'+Math.random().toString(36).substring(2,10);
+      els.result.textContent=`Validation passed – mock token: ${token}`;
+      els.result.className='ok';
+      
+      els.submitBtn.classList.remove('loading');
+      els.submitBtn.disabled = false;
+    },1200);
+  });
+
+  document.getElementById('resetBtn').addEventListener('click',()=>{
+    document.getElementById('cardForm').reset();
+    clearAll(); 
+    showLogo('Unknown');
+    els.prevPan.textContent='•••• •••• •••• ••••';
+    els.prevName.textContent='FULL NAME';
+    els.prevExp.textContent='MM/YY';
+    els.prevCvv.textContent='•••';
+    els.card.classList.remove('flipped');
+    
+    els.submitBtn.classList.remove('loading');
+    els.submitBtn.disabled = false;
+  });
+
+  showLogo('Unknown');
+})();
+</script>
+</body>
+</html>
